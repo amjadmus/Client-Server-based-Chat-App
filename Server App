@@ -1,0 +1,67 @@
+import socket
+import threading
+
+IP = ''
+Port = 4500
+BUFSIZE = 1024
+encod = 'utf-8'
+
+addresses = {}
+clients = {}
+
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+server_socket.bind((IP, Port))
+
+server_socket.listen(5)
+print('waiting for connections..')
+
+
+
+def accept_connections():
+    '''handles incoming clients'''
+    while True:
+        client, client_address = server_socket.accept()
+        print("%s:%s connected." % client_address)
+        client.send(bytes('Welcome, type your name and press enter', encod))
+        addresses[client] = client_address
+        threading.Thread(target=handle_client , args=(client,)).start()
+
+
+def sendall(msg, prefix=''):
+    '''broadcasts a message to clients'''
+
+    for sock in clients:
+        sock.send(bytes(prefix, encod)+ msg)
+
+
+
+def handle_client(client):
+    ''' handles a client connection'''
+    name = client.recv(BUFSIZE).decode(encod)
+    welcome = 'welcome %s! if you want to quit, type {quit} to exit' % name
+    client.send(bytes(welcome, encod))
+    msg = '%s joined the chat' %name
+    sendall(bytes(msg, encod))
+    clients[client] = name
+
+    while True:
+        msg = client.recv(BUFSIZE)
+        if msg != bytes('{quit}', encod):
+            sendall(msg, name+': ')
+        else:
+            client.send(bytes('{quit}', encod))
+            client.close()
+            del clients[client]
+            sendall(bytes('%s left the chat' %name, encod))
+            break
+
+
+
+
+
+if __name__ == "__main__":
+    accept_thread = threading.Thread(target=accept_connections)
+    accept_thread.start()
+    accept_thread.join()
+    server_socket.close()
